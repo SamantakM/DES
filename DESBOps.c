@@ -3,7 +3,6 @@
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
-#include <math.h>
 
 
 const int initialPermutation [64] = {
@@ -117,11 +116,10 @@ const int InverseIP[64] = {
     33,  1, 41,  9, 49, 17, 57, 25
 };
 
-const char HexMap[]={'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
 
 void printB(uint64_t number, int size){
     for (int i = size-1; i >= 0; i--) 
-        if (number >> i & 0x1) 
+        if (number >> i & 1) 
             putchar('1');
         else 
             putchar('0');
@@ -171,15 +169,10 @@ uint64_t pCh2(uint64_t a){
 }
 
 void LShift(uint64_t * a, int shift){
-    uint32_t halfLeft= *a >> 28;
-    uint32_t halfRight= *a & 0xFFFFFFF;
-    halfLeft= halfLeft<<shift | halfLeft >> (28-shift);
-    halfLeft=halfLeft & 0xFFFFFFF;
-    *a =halfLeft;
-    *a=*a<<28;
-    halfRight= halfRight<<shift | halfRight >> (28-shift);
-    halfRight=halfRight & 0xFFFFFFF;
-    *a+=halfRight;
+    uint64_t keep=0x80000008000000;
+    uint64_t clear= 0xFFFFFFEFFFFFFE;
+    for(int i=0; i<shift; i++)
+        *a=( *a << 1 & clear ) | (*a & keep)>>27;
 }
 
 uint64_t ExpantionP(uint64_t a){
@@ -347,11 +340,11 @@ int main(){
     uint64_t * result= ECBACII(pt,pass);
 
 
-    //for(int i = 0; i < roundUP(strlen(pt)/8.0); i++)
-    //    printf("%llx ",(unsigned long long)result[i]);
+   for(int i = 0; i < roundUP(strlen(pt)/8.0); i++)
+        printf("%llx ",(unsigned long long)result[i]);
     
     
-    clock_t t; 
+   clock_t t; 
     t = clock(); 
     int x;
 
