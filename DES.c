@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 const int initialPermutation [64] = 
 {
@@ -163,7 +164,7 @@ int * pCh1(int* c){
 void LShift(int * a, int round){
     int i, shift=Schedule [round-1];
     while(shift){
-        --shift;
+        shift--;
         for(i=0; i<27;i++)
             swap(&a[i],&a[i+1]);
         for(i=28; i<55;i++)
@@ -205,7 +206,6 @@ int ** split(int * a, int size, int sections ){
     for(i=0;i<sections;i++)
         for(j=0;j<size;j++)
             bin[i][j]=a[i*size+j];
-    
     return bin;
 }
 
@@ -240,7 +240,6 @@ int * SB(int* a){
     for(i=0;i<8;i++)
         free(sixes[i]);
     free(sixes);
-    free(a);
     return bin;
 }
 
@@ -249,7 +248,6 @@ int * permutation(int *a){
     int i=0;
     for(i=0;i<32;i++)
         temp[i]=a[PF[i]-1];
-    free(a);
     return temp;
 }
 
@@ -271,18 +269,15 @@ int * join(int * a, int *b,int size){
     return joined;    
 }
 
-void performRound(int * pt, int* key,int round){
-    LShift(key,round);//left shifted 56bits
+void performRound(int * pt, int* key){
     int * Ki=pCh2(key);//48 bit key after contraction
-
     int** ptLR=split(pt,32,2);//split plain text left and right parts
     int* expanded=ExpantionP(ptLR[1]);//48 bit expanded plain text
-
     int i;
     int* X=XOR(Ki,expanded,48);
-    X=SB(X);
-    X=permutation(X);
-    int * Y=XOR(X,ptLR[0],32);
+    int *Sboxed=SB(X);
+    int *PSboxed=permutation(Sboxed);
+    int * Y=XOR(PSboxed,ptLR[0],32);
     int * t=join(ptLR[1],Y,32);
     for(i=0;i<64;i++)
         pt[i]=t[i]; 
@@ -290,6 +285,8 @@ void performRound(int * pt, int* key,int round){
     free(expanded);
     for(i=0;i<2;i++)
         free(ptLR[i]);
+    free(Sboxed);
+    free(PSboxed);
     free(ptLR);
     free(Ki);
     free(Y);
@@ -301,30 +298,70 @@ int * finalPerm(int * a){
     int i;
     for(i=0;i<64;i++)
         bin[i]=a[InverseIP[i]-1];
-    free(a);
     return bin;
 }
 
 int * encryptBin(int * bDATA , int* key){
     int i,j,k;
     int* ptBin= initialPermute(bDATA);//initial permutation of plain text
-
     int* passBin=pCh1(key);//56 bit key
-    for(i=1;i<=16;i++){
-            performRound(ptBin,passBin,i);
-    }
-    int ** SPL=split(ptBin,32,2);
 
+    for(i=1;i<=16;i++){
+			LShift(passBin,i);
+            performRound(ptBin,passBin);
+    }
+
+    int ** SPL=split(ptBin,32,2);
     int * ptBinJoined=join(SPL[1],SPL[0],32);
-    ptBinJoined=finalPerm(ptBinJoined);
-    free(bDATA);
-    free(key);
+    int * FinalPerm=finalPerm(ptBinJoined);
+    free(ptBinJoined);
     free(ptBin);
     free(passBin);
     for(i=0;i<2;i++)
         free(SPL[i]);
     free(SPL);
-    return ptBinJoined;
+    return FinalPerm;
+}
+
+int ** keys16(int * key){
+	int ** keys=(int **) malloc(16 * sizeof(int *));
+	int i,j,k;	
+	for(i=0; i<16;i++)
+		keys[i]=(int *) malloc(56* sizeof(int));
+	
+	for(k=0; k<56;k++)
+		keys[0][k]=key[k];
+	LShift(keys[0],1);
+	for(i=1; i<16;i++){
+		for(k=0; k<56;k++)
+			keys[i][k]=keys[i-1][k];
+		LShift(keys[i],i+1);	
+		}
+
+	return keys;
+}
+
+int * decryptBin(int * bDATA , int* key){
+	int* ptBin= initialPermute(bDATA);
+	int i;
+	int* passBin=pCh1(key);
+	int ** keyss=keys16(passBin);
+    for(i=15;i>=0;i--)
+			performRound(ptBin,keyss[i]);
+
+	int ** SPL=split(ptBin,32,2);
+    int * ptBinJoined=join(SPL[1],SPL[0],32);
+    int * FinalPerm=finalPerm(ptBinJoined);
+    free(ptBinJoined);
+    free(ptBin);
+    free(passBin);
+    for(i=0;i<2;i++)
+        free(SPL[i]);
+    free(SPL);
+    for(i=0;i<16;i++)
+        free(keyss[i]);
+    free(keyss);
+	return FinalPerm;
 }
 
 char * bintohex(int * bin){
@@ -343,6 +380,8 @@ char * bintohex(int * bin){
     return hex;
 }
 
+
+
 int main(){
     char pt[]="testtext";
     char pass[]="passtext";
@@ -350,9 +389,29 @@ int main(){
     int * ptB=toBin64(pt);
     int * passB=toBin64(pass);
     int * result=encryptBin(ptB,passB);
+
+    clock_t t; 
+    t = clock(); 
+    int x;
+
+    for (int j=0; j<100000; j++){
+        ptB= toBin64(pt);
+        passB= toBin64(pass);
+	    result= encryptBin(ptB,passB);
+        free(ptB);
+        free(passB);
+        free(result);
+	}
+
+    t = clock() - t; 
+    double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds 
+    printf("fun() took %f seconds to execute \n", time_taken);
+
     char * hex=bintohex(result);
     printf("%s\n",hex);
     free(result);
     free(hex);
     return 0;
 }
+
+
