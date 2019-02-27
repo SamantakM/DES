@@ -214,9 +214,9 @@ int selectSBox(int bit6, int index){
         return 0;
     int firstandlast=0;
     firstandlast+= (bit6&32)>>4;
-    firstandlast+=bit6&1;
-    bit6=bit6>>1;
-    int mid4=bit6&15;
+    firstandlast+= bit6&1;
+    bit6= bit6>>1;
+    int mid4= bit6&15;
     return Sbox[index][firstandlast][mid4];
 }
 
@@ -331,42 +331,61 @@ uint64_t * ECBACII (char plainText[], char key[]){
     return ret;
 }
 
-int main(){
-    char pt[]="testtexttesttexttesttexttesttexttesttexttes";
-    char pass[]="passtext";
+char * hexToString(uint64_t * hex, int size){
+    char* string=(char *) malloc(size * 8 * sizeof(char));
+    int count=0;
+    int end=size-1;
+    for (int i=size*8-1; i>=0; i--){
+        string[i]=hex[end] & 0xFF;
+        hex[end]= hex[end]>>8;
+        count+=8 ;
+        if(count==64){
+            end--;
+            count=0;
+        }
+    }
+    return string;
+}
 
-    uint64_t i= toBin64(pt);
+int main(){
+    char pt[]="the quick brown fox jumped over the lazy dog";
+    char pass[8]="goodpass";
+
     uint64_t k= toBin64(pass);
     uint64_t * result= ECBACII(pt,pass);
 
-
+    printf("Cipher text hex: ");
    for(int i = 0; i < roundUP(strlen(pt)/8.0); i++)
         printf("%llx ",(unsigned long long)result[i]);
+
+    uint64_t * decResult= ECBbin(result,k,roundUP(strlen(pt)/8.0),1);
+
+    printf("\nPlain text hex: ");
+
+    for(int i = 0; i < roundUP(strlen(pt)/8.0); i++)
+       printf("%llx ",(unsigned long long)decResult[i]);
+
+    char* string= hexToString(decResult,roundUP(strlen(pt)/8.0));
+    printf("\nPlain text ASCII: %s\n", string);
     
-    
-   clock_t t; 
+    free(string);
+    free(result);
+    free(decResult);
+
+    /*
+       clock_t t; 
     t = clock(); 
     int x;
 
     for (int j=0; j<10000; j++){
-        result= ECBACII(pt,pass);
-        free(result);
+        //result= ECBACII(pt,pass);
+        //free(result);
 	}
 
     t = clock() - t; 
     double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds 
     printf("fun() took %f seconds to execute \n", time_taken);
-
-    result= ECBbin(result,k,6,1);
-
-  //  for(int i = 0; i < roundUP(strlen(pt)/8.0); i++)
-    //    printf("%llx ",(unsigned long long)result[i]);
-
-    free(result);
-
-    //printf("\n\nPlaintext hex:            %llx\n",(unsigned long long)i);
-    //printf("Ciphertext hex:           %llx\n",(unsigned long long)result);
-   // printf("Decrypted ciphertext hex: %llx\n",(unsigned long long)decryptBin(result,k));
+    */
 
     return 0;
 }
